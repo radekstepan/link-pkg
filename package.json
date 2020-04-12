@@ -1,0 +1,12 @@
+{
+  "name": "link-pkg",
+  "version": "0.1.0",
+  "description": "Symlink JS packages",
+  "main": "index.js",
+  "bin": {
+    "link-pkg": "./index.js"
+  },
+  "repository": "https://github.com/radekstepan/link-pkg",
+  "license": "UNLICENSED",
+  "private": true
+}
