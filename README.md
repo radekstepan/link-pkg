@@ -16,11 +16,13 @@ Install globally:
 
 ```bash
 $ npm i radekstepan/link-pkg -g
+$ cd <PATH_TO_PROJECT>
 $ link-pkg <PATH_TO_PACKAGE>
 ```
 
 OR use one-off:
 
 ```bash
+$ cd <PATH_TO_PROJECT>
 $ npx radekstepan/link-pkg <PATH_TO_PACKAGE>
 ```
