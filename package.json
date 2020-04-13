@@ -7,6 +7,5 @@
     "link-pkg": "./index.js"
   },
   "repository": "https://github.com/radekstepan/link-pkg",
-  "license": "UNLICENSED",
-  "private": true
+  "license": "UNLICENSED"
 }

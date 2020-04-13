@@ -1,9 +1,9 @@
 #!/usr/bin/env node
-const {promises: fs} = require('fs');
-const path = require('path');
+const {promises: {readdir, mkdir, rmdir, readFile, unlink, symlink}} = require('fs');
+const {parse, resolve, dirname} = require('path');
 
 const cwd = process.cwd();
-const {root: rootDir} = path.parse(cwd);
+const {root: rootDir} = parse(cwd);
 
 // Recursively yield files up to root directory.
 async function* yieldFiles(dir) {
@@ -11,15 +11,15 @@ async function* yieldFiles(dir) {
     return;
   }
 
-  const entries = await fs.readdir(dir, {withFileTypes: true});
+  const entries = await readdir(dir, {withFileTypes: true});
   for (const entry of entries) {
-    const res = path.resolve(dir, entry.name);
+    const res = resolve(dir, entry.name);
     if (!entry.isDirectory()) {
       yield res;
     }
   }
 
-  yield* yieldFiles(path.resolve(dir, '../'));
+  yield* yieldFiles(resolve(dir, '../'));
 }
 
 (async function run() {
@@ -28,7 +28,7 @@ async function* yieldFiles(dir) {
     let hostDir;
     for await (const f of yieldFiles(cwd)) {
       if (f.endsWith('package.json')) {
-        hostDir = path.dirname(f);
+        hostDir = dirname(f);
         break;
       }
     }
@@ -47,27 +47,41 @@ async function* yieldFiles(dir) {
 
     let remoteJson;
     try {
-      const json = await fs.readFile(path.resolve(pkgDir, 'package.json'), 'utf-8');
-      remoteJson = JSON.parse(await fs.readFile(json));
+      const json = await readFile(resolve(pkgDir, 'package.json'), 'utf-8');
+      remoteJson = JSON.parse(json);
     } catch {
       throw new Error(`Node.js package in path "${pkgDir}" does not exist`);
     }
+    const {name: pkgName} = remoteJson;
+    const [scope, name] = pkgName.split('/');
 
     // Check for breaking version changes.
     try {
-      const f = await fs.readFile(path.resolve(hostDir, 'package.json'), 'utf-8');
+      const f = await readFile(resolve(hostDir, `node_modules/${pkgName}/package.json`), 'utf-8');
       const localJson = JSON.parse(f);
       const [localVer, remoteVer] = [localJson, remoteJson].map(json => parseInt(json.version.split('.')[0], 10))
       if (remoteVer > localVer) {
-        console.log(`${remoteJson.name} version ${remoteVer} > ${localVer}; make sure all dependencies are installed`);
+        console.log(`${pkgName} ${remoteJson.version} > ${localJson.version}; make sure all dependencies are installed`);
       }
     } catch (_err) {}
 
-    // TODO recursively create the path structure.
+    // Create the path structure.
+    try {
+      await mkdir(resolve(hostDir, name ? `node_modules/${scope}` : 'node_modules'), {recursive: true});
+    } catch (_err) {}
 
-    // TODO remove any existing directory/link.
+    const pkgPath = resolve(hostDir, `node_modules/${pkgName}`);
 
-    // TODO symlink itself.
+    // Cleanup.
+    try {
+      await rmdir(pkgPath, {recursive: true});
+      await unlink(pkgPath);
+    } catch (_err) {}
+
+    // Symlink itself.
+    await symlink(resolve(pkgDir), pkgPath);
+
+    console.log(`${pkgName}@${remoteJson.version} linked`);
 
     process.exit(0);
   } catch (err) {
