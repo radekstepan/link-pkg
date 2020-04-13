@@ -1,7 +1,7 @@
 {
   "name": "link-pkg",
-  "version": "0.1.0",
-  "description": "Symlink JS packages",
+  "version": "0.1.1",
+  "description": "Symlink Node.js packages",
   "main": "index.js",
   "bin": {
     "link-pkg": "./index.js"

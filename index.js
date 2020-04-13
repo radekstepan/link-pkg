@@ -32,32 +32,35 @@ async function* yieldFiles(dir) {
         break;
       }
     }
-
-    try {
-      await !hostDir;
-    } catch {
+    if (!hostDir) {
       throw new Error(`"${cwd}" is not in the path of a Node.js project to link to`);
     }
 
     // Check that Node.js package path has been provided as an argument.
-    const [pkgDir] = process.argv.slice(2);
+    let [pkgDir] = process.argv.slice(2);
     if (!pkgDir) {
       throw new Error('Provide a path to a Node.js package as an argument');
     }
+    pkgDir = resolve(pkgDir);
 
     let remoteJson;
     try {
-      const json = await readFile(resolve(pkgDir, 'package.json'), 'utf-8');
+      const json = await readFile(`${pkgDir}/package.json`, 'utf-8');
       remoteJson = JSON.parse(json);
     } catch {
       throw new Error(`Node.js package in path "${pkgDir}" does not exist`);
     }
     const {name: pkgName} = remoteJson;
     const [scope, name] = pkgName.split('/');
+    const pkgPath = `${hostDir}/node_modules/${pkgName}`;
+
+    if (pkgDir === pkgPath) {
+      throw new Error('You are trying to link a package onto itself');
+    }
 
     // Check for breaking version changes.
     try {
-      const f = await readFile(resolve(hostDir, `node_modules/${pkgName}/package.json`), 'utf-8');
+      const f = await readFile(`${hostDir}/node_modules/${pkgName}/package.json`, 'utf-8');
       const localJson = JSON.parse(f);
       const [localVer, remoteVer] = [localJson, remoteJson].map(json => parseInt(json.version.split('.')[0], 10))
       if (remoteVer > localVer) {
@@ -67,10 +70,8 @@ async function* yieldFiles(dir) {
 
     // Create the path structure.
     try {
-      await mkdir(resolve(hostDir, name ? `node_modules/${scope}` : 'node_modules'), {recursive: true});
+      await mkdir(hostDir + (name ? `/node_modules/${scope}` : '/node_modules'), {recursive: true});
     } catch (_err) {}
-
-    const pkgPath = resolve(hostDir, `node_modules/${pkgName}`);
 
     // Cleanup.
     try {
@@ -79,7 +80,7 @@ async function* yieldFiles(dir) {
     } catch (_err) {}
 
     // Symlink itself.
-    await symlink(resolve(pkgDir), pkgPath);
+    await symlink(pkgDir, pkgPath);
 
     console.log(`${pkgName}@${remoteJson.version} linked`);
 
