@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-const {promises: {readdir, mkdir, rmdir, readFile, unlink, symlink}} = require('fs');
+const {promises: {readdir, mkdir, rmdir, readFile, unlink, symlink, lstat}} = require('fs');
 const {parse, resolve, dirname} = require('path');
 
 const cwd = process.cwd();
@@ -20,6 +20,30 @@ async function* yieldFiles(dir) {
   }
 
   yield* yieldFiles(resolve(dir, '../'));
+}
+
+// Remove a file or /recursively remove a directory with contents; as {recursive: true} may not be supported.
+async function rmpath(path, isDirectory = null) {
+  let isDir = isDirectory;
+  if (isDir === null) {
+    const entry = await lstat(path);
+    isDir = entry.isDirectory();
+  }
+
+  if (isDir) {
+    const entries = await readdir(path, {withFileTypes: true});
+    for (const entry of entries) {
+      const newPath = `${path}/${entry.name}`;
+      if (entry.isDirectory()) {
+        await rmpath(newPath, true);
+      } else {
+        await rmpath(newPath, false);
+      }
+    }
+    await rmdir(path);
+  } else {
+    await unlink(path);
+  }
 }
 
 (async function run() {
@@ -74,10 +98,7 @@ async function* yieldFiles(dir) {
     } catch (_err) {}
 
     // Cleanup.
-    try {
-      await rmdir(pkgPath, {recursive: true});
-      await unlink(pkgPath);
-    } catch (_err) {}
+    await rmpath(pkgPath);
 
     // Symlink itself.
     await symlink(pkgDir, pkgPath);
